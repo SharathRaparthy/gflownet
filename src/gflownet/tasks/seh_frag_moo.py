@@ -1,6 +1,8 @@
+import sys
 import ast
 from typing import Any, Callable, Dict, List, Tuple, Union
-
+import wandb
+import yaml
 import numpy as np
 from rdkit.Chem import Descriptors
 from rdkit.Chem import QED
@@ -22,6 +24,8 @@ from gflownet.utils import metrics
 from gflownet.utils import sascore
 from gflownet.utils.transforms import thermometer
 
+import warnings
+warnings.filterwarnings("ignore")
 
 class SEHMOOTask(GFNTask):
     """Sets up a multiobjective task where the rewards are (functions of):
@@ -33,12 +37,14 @@ class SEHMOOTask(GFNTask):
     The proxy is pretrained, and obtained from the original GFlowNet paper, see `gflownet.models.bengio2021flow`.
     """
     def __init__(self, dataset: Dataset, temperature_distribution: str, temperature_parameters: Tuple[float],
-                 wrap_model: Callable[[nn.Module], nn.Module] = None):
+                 const_temp: int, dirichlet_param: float, wrap_model: Callable[[nn.Module], nn.Module] = None):
         self._wrap_model = wrap_model
         self.models = self._load_task_models()
         self.dataset = dataset
         self.temperature_sample_dist = temperature_distribution
         self.temperature_dist_params = temperature_parameters
+        self.const_temp = const_temp
+        self.dirichlet_param = dirichlet_param
 
     def flat_reward_transform(self, y: Union[float, Tensor]) -> FlatRewards:
         return FlatRewards(torch.as_tensor(y))
@@ -53,6 +59,9 @@ class SEHMOOTask(GFNTask):
 
     def sample_conditional_information(self, n):
         beta = None
+        use_funky_dirichlet = False
+        upper_bound = None
+
         if self.temperature_sample_dist == 'gamma':
             loc, scale = self.temperature_dist_params
             beta = self.rng.gamma(loc, scale, n).astype(np.float32)
@@ -63,9 +72,13 @@ class SEHMOOTask(GFNTask):
         elif self.temperature_sample_dist == 'beta':
             beta = self.rng.beta(*self.temperature_dist_params, n).astype(np.float32)
             upper_bound = 1
+        elif self.temperature_sample_dist == 'const':
+            beta = np.ones(n).astype(np.float32)
+            beta = beta * self.const_temp
+            upper_bound = self.const_temp
         beta_enc = thermometer(torch.tensor(beta), 32, 0, upper_bound)  # TODO: hyperparameters
-        if 0:
-            m = Dirichlet(torch.FloatTensor([1.5] * 4))
+        if not use_funky_dirichlet:
+            m = Dirichlet(torch.FloatTensor([self.dirichlet_param] * 4))
             preferences = m.sample([n])
         else:
             a = np.random.dirichlet([1] * 4, n)
@@ -119,7 +132,7 @@ class SEHMOOFragTrainer(SEHFragTrainer):
     def setup(self):
         super().setup()
         self.task = SEHMOOTask(self.training_data, self.hps['temperature_sample_dist'],
-                               ast.literal_eval(self.hps['temperature_dist_params']), wrap_model=self._wrap_model_mp)
+                               ast.literal_eval(self.hps['temperature_dist_params']),dirichlet_param=self.hps['dirichlet_param'], const_temp=self.hps['const_temp'],  wrap_model=self._wrap_model_mp)
         self.sampling_hooks.append(MultiObjectiveStatsHook(256))
 
 
@@ -172,16 +185,22 @@ class MultiObjectiveStatsHook:
 
 def main():
     """Example of how this model can be run outside of Determined"""
-    hps = {
+    with open("hp_sweep.yaml", "r") as stream:
+        hp_sweep_dict = yaml.safe_load(stream)
+    default_hps = {
         'lr_decay': 10000,
-        'log_dir': '/scratch/logs/seh_frag_moo/run_3/',
+        'log_dir': 'logs/seh_frag_moo/run_3/',
         'num_training_steps': 20_000,
         'validate_every': 500,
         'sampling_tau': 0.95,
         'num_layers': 6,
         'num_data_loader_workers': 12,
         'temperature_dist_params': '(0, 32)',
+        'const_temp': 32,
+        'temperature_sample_dist': 'const'
     }
+    wandb.init(project='mo-gfn', config=hp_sweep_dict)
+    hps = {**default_hps, **wandb.config}
     trial = SEHMOOFragTrainer(hps, torch.device('cuda'))
     trial.verbose = True
     trial.run()
@@ -189,3 +208,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+    sys.exit()
