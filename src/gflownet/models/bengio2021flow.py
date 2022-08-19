@@ -73,7 +73,7 @@ def load_original_model():
     mpnn = MPNNet(num_feat=num_feat, num_vec=0, dim=64, num_out_per_mol=1, num_out_per_stem=105, num_conv_steps=12)
 #    f = requests.get("https://github.com/GFNOrg/gflownet/raw/master/mols/data/pretrained_proxy/best_params.pkl.gz",
 #                     stream=True)
-    with gzip.open("/home/raparths/scratch/mogfn/gflownet/src/gflownet/models/best_params.pkl.gz", "rb") as f:
+    with gzip.open("/workspace/mila-top/mo-gfn/gflownet/src/gflownet//models/best_params.pkl.gz", "rb") as f:
         params = pickle.load(f)
     param_map = {
         'lin0.weight': params[0],

@@ -25,10 +25,11 @@ def _get_requirements(path: str = 'requirements', ext: str = 'in') -> Tuple[List
             extras_require[req_file.stem] = lines
     return install_requires, extras_require
 
+setup()
 
-install_requires, extras_require = _get_requirements()
-
-setup(
-    install_requires=install_requires,
-    extras_require=extras_require,
-)
+# install_requires, extras_require = _get_requirements()
+#
+# setup(
+#     install_requires=install_requires,
+#     extras_require=extras_require,
+# )

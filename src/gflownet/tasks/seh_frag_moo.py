@@ -197,9 +197,11 @@ def main():
         'num_data_loader_workers': 12,
         'temperature_dist_params': '(0, 32)',
         'const_temp': 32,
-        'temperature_sample_dist': 'const'
+        'temperature_sample_dist': 'const',
+
     }
     wandb.init(project='mo-gfn', config=hp_sweep_dict)
+
     hps = {**default_hps, **wandb.config}
     trial = SEHMOOFragTrainer(hps, torch.device('cuda'))
     trial.verbose = True

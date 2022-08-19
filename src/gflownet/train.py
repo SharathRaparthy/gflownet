@@ -192,7 +192,8 @@ class GFNTrainer:
                 }, open(pathlib.Path(self.hps['log_dir']) / 'model_state.pt', 'wb'))
 
     def log(self, info, index, key):
-        if not hasattr(self, '_summary_writer'):
-            self._summary_writer = torch.utils.tensorboard.SummaryWriter(self.hps['log_dir'])
-        for k, v in info.items():
-            self._summary_writer.add_scalar(f'{key}_{k}', v, index)
+        pass
+        # if not hasattr(self, '_summary_writer'):
+        #     self._summary_writer = torch.utils.tensorboard.SummaryWriter(self.hps['log_dir'])
+        # for k, v in info.items():
+        #     self._summary_writer.add_scalar(f'{key}_{k}', v, index)
