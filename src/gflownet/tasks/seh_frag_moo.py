@@ -191,16 +191,16 @@ def main():
         'lr_decay': 10000,
         'log_dir': 'logs/seh_frag_moo/run_3/',
         'num_training_steps': 20_000,
-        'validate_every': 500,
+        'validate_every': 100,
         'sampling_tau': 0.95,
-        'num_layers': 6,
+        # 'num_layers': 6,
         'num_data_loader_workers': 12,
         'temperature_dist_params': '(0, 32)',
-        'const_temp': 32,
+        # 'const_temp': 32,
         'temperature_sample_dist': 'const',
 
     }
-    wandb.init(project='mo-gfn', config=hp_sweep_dict)
+    wandb.init(entity='mogfn', project='fragments', config=hp_sweep_dict)
 
     hps = {**default_hps, **wandb.config}
     trial = SEHMOOFragTrainer(hps, torch.device('cuda'))

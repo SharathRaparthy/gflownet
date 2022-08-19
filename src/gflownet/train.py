@@ -2,7 +2,7 @@ import pathlib
 from typing import Any, Callable, Dict, List, NewType, Optional, Tuple
 
 from rdkit.Chem.rdchem import Mol as RDMol
-import torch
+import torch, wandb
 from torch import Tensor
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -183,6 +183,7 @@ class GFNTrainer:
             self.log(info, it, 'train')
 
             if it % self.hps['validate_every'] == 0:
+                self.log(info, it, 'metric_train')
                 for batch in valid_dl:
                     info = self.evaluate_batch(batch.to(self.device), epoch_idx, batch_idx)
                     self.log(info, it, 'valid')
@@ -192,7 +193,52 @@ class GFNTrainer:
                 }, open(pathlib.Path(self.hps['log_dir']) / 'model_state.pt', 'wb'))
 
     def log(self, info, index, key):
-        pass
+        # print(info)
+        if key =='train':
+            wandb.log({'train_offline_loss': info['offline_loss']}, step=index)
+            wandb.log({'train_online_loss': info['online_loss']}, step=index)
+            wandb.log({'train_reward_loss': info['reward_loss']}, step=index)
+            wandb.log({'train_invalid_trajectories': info['invalid_trajectories']}, step=index)
+            wandb.log({'train_invalid_logprob': info['invalid_logprob']}, step=index)
+            wandb.log({'train_invalid_losses': info['invalid_losses']}, step=index)
+            wandb.log({'train_logZ': info['logZ']}, step=index)
+            wandb.log({'train HV with zero ref': info['HV with zero ref']}, step=index)
+            wandb.log({'train HV w/o zero ref': info['HV w/o zero ref']}, step=index)
+            wandb.log({'train Unnormalized HV with zero ref': info['Unnormalized HV with zero ref']}, step=index)
+            wandb.log({'train Unnormalized HV w/o zero ref': info['Unnormalized HV w/o zero ref']}, step=index)
+            wandb.log({'train hsri_with_pareto': info['hsri_with_pareto']}, step=index)
+            wandb.log({'train hsri_on_flat_rew': info['hsri_on_flat_rew']}, step=index)
+
+        elif key == 'metric_train':
+            # wandb.log({'val_offline_loss': info['offline_loss']}, step=index)
+            # wandb.log({'val_online_loss': info['online_loss']}, step=index)
+            # wandb.log({'val_reward_loss': info['reward_loss']}, step=index)
+            # wandb.log({'val_invalid_trajectories': info['invalid_trajectories']}, step=index)
+            # wandb.log({'val_invalid_logprob': info['invalid_logprob']}, step=index)
+            # wandb.log({'val_invalid_losses': info['invalid_losses']}, step=index)
+            # wandb.log({'val_logZ': info['logZ']}, step=index)
+            wandb.log({'HV with zero ref': info['HV with zero ref']}, step=index)
+            wandb.log({'HV w/o zero ref': info['HV w/o zero ref']}, step=index)
+            wandb.log({'Unnormalized HV with zero ref': info['Unnormalized HV with zero ref']}, step=index)
+            wandb.log({'Unnormalized HV w/o zero ref': info['Unnormalized HV w/o zero ref']}, step=index)
+            wandb.log({'hsri_with_pareto': info['hsri_with_pareto']}, step=index)
+            wandb.log({'hsri_on_flat_rew': info['hsri_on_flat_rew']}, step=index)
+
+        elif key =='valid':
+            wandb.log({'val_offline_loss': info['offline_loss']}, step=index)
+            wandb.log({'val_online_loss': info['online_loss']}, step=index)
+            wandb.log({'val_reward_loss': info['reward_loss']}, step=index)
+            wandb.log({'val_invalid_trajectories': info['invalid_trajectories']}, step=index)
+            wandb.log({'val_invalid_logprob': info['invalid_logprob']}, step=index)
+            wandb.log({'val_invalid_losses': info['invalid_losses']}, step=index)
+            wandb.log({'val_logZ': info['logZ']}, step=index)
+            # wandb.log({'HV with zero ref': info['HV with zero ref']}, step=index)
+            # wandb.log({'HV w/o zero ref': info['HV w/o zero ref']}, step=index)
+            # wandb.log({'Unnormalized HV with zero ref': info['Unnormalized HV with zero ref']}, step=index)
+            # wandb.log({'Unnormalized HV w/o zero ref': info['Unnormalized HV w/o zero ref']}, step=index)
+            # wandb.log({'hsri_with_pareto': info['hsri_with_pareto']}, step=index)
+            # wandb.log({'hsri_on_flat_rew': info['hsri_on_flat_rew']}, step=index)
+
         # if not hasattr(self, '_summary_writer'):
         #     self._summary_writer = torch.utils.tensorboard.SummaryWriter(self.hps['log_dir'])
         # for k, v in info.items():
