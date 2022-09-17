@@ -37,7 +37,7 @@ class SEHMOOTask(GFNTask):
     The proxy is pretrained, and obtained from the original GFlowNet paper, see `gflownet.models.bengio2021flow`.
     """
     def __init__(self, dataset: Dataset, temperature_distribution: str, temperature_parameters: Tuple[float],
-                 const_temp: int, dirichlet_param: float, wrap_model: Callable[[nn.Module], nn.Module] = None):
+                 const_temp: int, dirichlet_param: float, num_objectives: int, wrap_model: Callable[[nn.Module], nn.Module] = None):
         self._wrap_model = wrap_model
         self.models = self._load_task_models()
         self.dataset = dataset
@@ -45,6 +45,7 @@ class SEHMOOTask(GFNTask):
         self.temperature_dist_params = temperature_parameters
         self.const_temp = const_temp
         self.dirichlet_param = dirichlet_param
+        self.num_objectives = num_objectives
 
     def flat_reward_transform(self, y: Union[float, Tensor]) -> FlatRewards:
         return FlatRewards(torch.as_tensor(y))
@@ -78,29 +79,32 @@ class SEHMOOTask(GFNTask):
             upper_bound = self.const_temp
         beta_enc = thermometer(torch.tensor(beta), 32, 0, upper_bound)  # TODO: hyperparameters
         if not use_funky_dirichlet:
-            m = Dirichlet(torch.FloatTensor([self.dirichlet_param] * 4))
+            m = Dirichlet(torch.FloatTensor([self.dirichlet_param] * self.num_objectives))
             preferences = m.sample([n])
         else:
-            a = np.random.dirichlet([1] * 4, n)
+            a = np.random.dirichlet([1] * self.num_objectives, n)
             b = np.random.exponential(1, n)[:, None]
             preferences = Dirichlet(torch.tensor(a * b)).sample([1])[0].float()
         encoding = torch.cat([beta_enc, preferences], 1)
         return {'beta': torch.tensor(beta), 'encoding': encoding, 'preferences': preferences}
 
-    def cond_info_to_reward(self, cond_info: Dict[str, Tensor], flat_reward: FlatRewards) -> RewardScalar:
+    def cond_info_to_reward(self, cond_info: Dict[str, Tensor], flat_reward: FlatRewards, mo_baseline: bool) -> RewardScalar:
         if isinstance(flat_reward, list):
             if isinstance(flat_reward[0], Tensor):
                 flat_reward = torch.stack(flat_reward)
             else:
                 flat_reward = torch.tensor(flat_reward)
-        scalar_reward = (flat_reward * cond_info['preferences']).sum(1)
+        if not mo_baseline:
+            scalar_reward = (flat_reward * cond_info['preferences']).sum(1)
+        else:
+            scalar_reward = (torch.abs(-flat_reward - torch.zeros(flat_reward.shape[1])) * cond_info['preferences']).max(1)[0]
         return scalar_reward**cond_info['beta']
 
     def compute_flat_rewards(self, mols: List[RDMol]) -> Tuple[FlatRewards, Tensor]:
         graphs = [bengio2021flow.mol2graph(i) for i in mols]
         is_valid = torch.tensor([i is not None for i in graphs]).bool()
         if not is_valid.any():
-            return FlatRewards(torch.zeros((0, 4))), is_valid
+            return FlatRewards(torch.zeros((0, self.num_objectives))), is_valid
         batch = gd.Batch.from_data_list([i for i in graphs if i is not None])
         batch.to(self.device)
         seh_preds = self.models['seh'](batch).reshape((-1,)).clip(1e-4, 100).data.cpu() / 8
@@ -117,7 +121,8 @@ class SEHMOOTask(GFNTask):
         sas = (10 - sas) / 9  # Turn into a [0-1] reward
         molwts = torch.tensor([safe(Descriptors.MolWt, i, 1000) for i, v in zip(mols, is_valid) if v.item()])
         molwts = ((300 - molwts) / 700 + 1).clip(0, 1)  # 1 until 300 then linear decay to 0 until 1000
-        flat_rewards = torch.stack([seh_preds, qeds, sas, molwts], 1)
+        objectives = [seh_preds, qeds, sas, molwts][:self.num_objectives]
+        flat_rewards = torch.stack(objectives, 1)
         return FlatRewards(flat_rewards), is_valid
 
 
@@ -126,13 +131,20 @@ class SEHMOOFragTrainer(SEHFragTrainer):
         return {
             **super().default_hps(),
             'use_fixed_weight': False,
-            'num_cond_dim': 32 + 4,  # thermometer encoding of beta + 4 preferences
+            'num_cond_dim': 32,  # thermometer encoding of beta + 4 preferences
         }
 
     def setup(self):
         super().setup()
-        self.task = SEHMOOTask(self.training_data, self.hps['temperature_sample_dist'],
-                               ast.literal_eval(self.hps['temperature_dist_params']),dirichlet_param=self.hps['dirichlet_param'], const_temp=self.hps['const_temp'],  wrap_model=self._wrap_model_mp)
+        self.task = SEHMOOTask(
+            self.training_data,
+            self.hps['temperature_sample_dist'],
+            ast.literal_eval(self.hps['temperature_dist_params']),
+            dirichlet_param=self.hps['dirichlet_param'],
+            const_temp=self.hps['const_temp'],
+            num_objectives=self.hps['num_objectives'],
+            wrap_model=self._wrap_model_mp
+        )
         self.sampling_hooks.append(MultiObjectiveStatsHook(256))
 
 
@@ -189,7 +201,7 @@ def main():
         hp_sweep_dict = yaml.safe_load(stream)
     default_hps = {
         'lr_decay': 10000,
-        'log_dir': 'logs/seh_frag_moo/run_3/',
+        'log_dir': 'logs/seh_frag_moo/run_1/',
         'num_training_steps': 20_000,
         'validate_every': 500,
         'sampling_tau': 0.95,
@@ -197,10 +209,22 @@ def main():
         'num_data_loader_workers': 12,
         'temperature_dist_params': '(0, 32)',
         'const_temp': 32,
-        'temperature_sample_dist': 'const'
+        'temperature_sample_dist': 'const',
+        'baseline_training': False,
+        'num_emb': 64,
+        'global_batch_size': 64,
+        'learning_rate': 0.0001,
+        'dirichlet_param': 1.5,
+        'num_objectives': 2,
+        'experiment_name': '',
     }
-    wandb.init(project='mo-gfn', config=hp_sweep_dict)
-    hps = {**default_hps, **wandb.config}
+    if default_hps['baseline_training']:
+        default_hps['experiment_name'] = f'seh_frag_moo_baseline/{default_hps["num_objectives"]}_obj'
+    else:
+        default_hps['experiment_name'] = f'seh_frag_moo/{default_hps["num_objectives"]}_obj'
+    default_hps['log_dir'] = default_hps['log_dir'] + default_hps["experiment_name"] + "/"
+    wandb.init(project='mo-gfn', config=hp_sweep_dict, name='seh_frag_moo | number of objectives: ' + str(default_hps['num_objectives']))
+    hps = {**default_hps, **hp_sweep_dict}
     trial = SEHMOOFragTrainer(hps, torch.device('cuda'))
     trial.verbose = True
     trial.run()

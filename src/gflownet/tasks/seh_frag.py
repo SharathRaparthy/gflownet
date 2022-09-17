@@ -13,6 +13,7 @@ from torch.utils.data import Dataset
 import torch_geometric.data as gd
 
 from gflownet.algo.trajectory_balance import TrajectoryBalance
+from gflownet.algo.multiobjective_reinforce import MultiObjectiveReinforce
 from gflownet.envs.frag_mol_env import FragMolBuildingEnvContext
 from gflownet.envs.graph_building_env import GraphBuildingEnv
 from gflownet.models import bengio2021flow
@@ -109,6 +110,7 @@ class SEHFragTrainer(GFNTrainer):
             'random_action_prob': 0.,
             'sampling_tau': 0.,
             'num_cond_dim': 32,
+            'baseline_training': False
         }
 
     def setup(self):
@@ -116,7 +118,7 @@ class SEHFragTrainer(GFNTrainer):
         RDLogger.DisableLog('rdApp.*')
         self.rng = np.random.default_rng(142857)
         self.env = GraphBuildingEnv()
-        self.ctx = FragMolBuildingEnvContext(max_frags=9, num_cond_dim=hps['num_cond_dim'])
+        self.ctx = FragMolBuildingEnvContext(max_frags=9, num_cond_dim=hps['num_cond_dim'] + hps['num_objectives'])
         self.training_data = []
         self.test_data = []
         self.offline_ratio = 0
@@ -140,7 +142,10 @@ class SEHFragTrainer(GFNTrainer):
             self.sampling_model = self.model
         eps = hps['tb_epsilon']
         hps['tb_epsilon'] = ast.literal_eval(eps) if isinstance(eps, str) else eps
-        self.algo = TrajectoryBalance(self.env, self.ctx, self.rng, hps, max_nodes=9)
+        if hps['baseline_training']:
+            self.algo = MultiObjectiveReinforce(self.env, self.ctx, self.rng, hps, max_nodes=9)
+        else:
+            self.algo = TrajectoryBalance(self.env, self.ctx, self.rng, hps, max_nodes=9)
 
         self.task = SEHTask(self.training_data, hps['temperature_sample_dist'],
                             ast.literal_eval(hps['temperature_dist_params']), wrap_model=self._wrap_model_mp)

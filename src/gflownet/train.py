@@ -15,6 +15,7 @@ from gflownet.envs.graph_building_env import GraphBuildingEnv
 from gflownet.envs.graph_building_env import GraphBuildingEnvContext
 from gflownet.utils.multiprocessing_proxy import wrap_model_mp
 
+import wandb
 # This type represents an unprocessed list of reward signals/conditioning information
 FlatRewards = NewType('FlatRewards', Tensor)  # type: ignore
 
@@ -141,7 +142,7 @@ class GFNTrainer:
     def build_training_data_loader(self) -> DataLoader:
         model, dev = self._wrap_model_mp(self.sampling_model)
         iterator = SamplingIterator(self.training_data, model, self.mb_size * 2, self.ctx, self.algo, self.task, dev,
-                                    ratio=self.offline_ratio, log_dir=self.hps['log_dir'])
+                                    ratio=self.offline_ratio, log_dir=self.hps['log_dir'], mo_baseline=self.hps['baseline_training'])
         for hook in self.sampling_hooks:
             iterator.add_log_hook(hook)
         return torch.utils.data.DataLoader(iterator, batch_size=None, num_workers=self.num_workers,
@@ -150,7 +151,7 @@ class GFNTrainer:
     def build_validation_data_loader(self) -> DataLoader:
         model, dev = self._wrap_model_mp(self.model)
         iterator = SamplingIterator(self.test_data, model, self.mb_size, self.ctx, self.algo, self.task, dev,
-                                    ratio=self.valid_offline_ratio, stream=False)
+                                    ratio=self.valid_offline_ratio, stream=False, mo_baseline=self.hps['baseline_training'])
         return torch.utils.data.DataLoader(iterator, batch_size=None, num_workers=self.num_workers,
                                            persistent_workers=self.num_workers > 0)
 
@@ -180,12 +181,12 @@ class GFNTrainer:
             info = self.train_batch(batch.to(self.device), epoch_idx, batch_idx)
             if self.verbose:
                 print(it, ' '.join(f'{k}:{v:.2f}' for k, v in info.items()))
-            self.log(info, it, 'train')
+            # self.log(info, it, 'train')
 
             if it % self.hps['validate_every'] == 0:
                 for batch in valid_dl:
                     info = self.evaluate_batch(batch.to(self.device), epoch_idx, batch_idx)
-                    self.log(info, it, 'valid')
+                    wandb.log(info)
                 torch.save({
                     'models_state_dict': [self.model.state_dict()],
                     'hps': self.hps,

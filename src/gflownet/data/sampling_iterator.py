@@ -1,7 +1,7 @@
 import os
 import sqlite3
 from typing import Callable, List
-
+from datetime import datetime
 import numpy as np
 from rdkit import Chem
 from rdkit import RDLogger
@@ -21,7 +21,7 @@ class SamplingIterator(IterableDataset):
 
     """
     def __init__(self, dataset: Dataset, model: nn.Module, batch_size: int, ctx, algo, task, device, ratio=0.5,
-                 stream=True, log_dir: str = None):
+                 stream=True, log_dir: str = None, mo_baseline: bool = False):
         """Parameters
         ----------
         dataset: Dataset
@@ -42,7 +42,8 @@ class SamplingIterator(IterableDataset):
             dataset iterator.
         log_dir: str
             If not None, logs each SamplingIterator worker's generated molecules to that file.
-
+        mo_baseline: bool
+            If True, we use the multiobjective_reinforce.py instead of the TB algorithm.
         """
         self.data = dataset
         self.model = model
@@ -55,7 +56,12 @@ class SamplingIterator(IterableDataset):
         self.task = task
         self.device = device
         self.stream = stream
-        self.log_dir = log_dir if self.ratio < 1 and self.stream else None
+        # Append current timestamp to log file name
+        if self.ratio < 1 and self.stream:
+            self.log_dir = os.path.join(log_dir, datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
+        else:
+            self.log_dir = None
+        self.mo_baseline = mo_baseline
         # This SamplingIterator instance will be copied by torch DataLoaders for each worker, so we
         # don't want to initialize per-worker things just yet, such as the log the worker writes
         # to. This must be done in __iter__, which is called by the DataLoader once this instance
@@ -156,7 +162,7 @@ class SamplingIterator(IterableDataset):
                         trajs[num_offline + i]['is_valid'] = is_valid[num_offline + i].item()
             flat_rewards = torch.stack(flat_rewards)
             # Compute scalar rewards from conditional information & flat rewards
-            rewards = self.task.cond_info_to_reward(cond_info, flat_rewards)
+            rewards = self.task.cond_info_to_reward(cond_info, flat_rewards, self.mo_baseline)
             rewards[torch.logical_not(is_valid)] = np.exp(self.algo.illegal_action_logreward)
             # Construct batch
             batch = self.algo.construct_batch(trajs, cond_info['encoding'], rewards)
