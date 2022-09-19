@@ -187,11 +187,11 @@ class MultiObjectiveStatsHook:
 
         return {
             'HV with zero ref': hypervolume_with_zero_ref,
-            'HV w/o zero ref': hypervolume_wo_zero_ref,
-            'Unnormalized HV with zero ref': unnorm_hypervolume_with_zero_ref,
-            'Unnormalized HV w/o zero ref': unnorm_hypervolume_wo_zero_ref,
-            'hsri_with_pareto': hsri_w_pareto,
-            'hsri_on_flat_rew': hsri_on_flat,
+            # 'HV w/o zero ref': hypervolume_wo_zero_ref,
+            # 'Unnormalized HV with zero ref': unnorm_hypervolume_with_zero_ref,
+            # 'Unnormalized HV w/o zero ref': unnorm_hypervolume_wo_zero_ref,
+            # 'hsri_with_pareto': hsri_w_pareto,
+            # 'hsri_on_flat_rew': hsri_on_flat,
         }
 
 
