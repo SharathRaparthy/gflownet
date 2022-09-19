@@ -181,12 +181,12 @@ class GFNTrainer:
             info = self.train_batch(batch.to(self.device), epoch_idx, batch_idx)
             if self.verbose:
                 print(it, ' '.join(f'{k}:{v:.2f}' for k, v in info.items()))
-            # self.log(info, it, 'train')
+            wandb.log(info)
 
             if it % self.hps['validate_every'] == 0:
                 for batch in valid_dl:
                     info = self.evaluate_batch(batch.to(self.device), epoch_idx, batch_idx)
-                    wandb.log(info)
+                    # wandb.log(info)
                 torch.save({
                     'models_state_dict': [self.model.state_dict()],
                     'hps': self.hps,
