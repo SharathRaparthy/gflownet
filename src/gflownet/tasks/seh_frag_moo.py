@@ -226,7 +226,7 @@ def main():
         'dirichlet_param': 1.5,
         'num_objectives': 2,
         'experiment_name': '',
-        'use_wandb': False,
+        'use_wandb': True,
         'hp_search': False,
         'baseline_training': True
     }
