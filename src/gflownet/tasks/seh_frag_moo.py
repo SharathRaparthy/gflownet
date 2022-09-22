@@ -241,13 +241,14 @@ def main():
         else:
             with open("configs/seh_moo_hp.yaml", "r") as stream:
                 hp_dict = yaml.safe_load(stream)
+    if default_hps['use_wandb']:
+        wandb.init(project='mo-gfn', config=hp_dict, name='seh_frag_moo | number of objectives: ' + str(default_hps['num_objectives']))
     if default_hps['baseline_training']:
         default_hps['experiment_name'] = f'seh_frag_moo_baseline/{default_hps["num_objectives"]}_obj/{default_hps["seed"]}'
     else:
         default_hps['experiment_name'] = f'seh_frag_moo/{default_hps["num_objectives"]}_obj/{default_hps["seed"]}'
     default_hps['log_dir'] = default_hps['log_dir'] + default_hps["experiment_name"] + "/"
-    if default_hps['use_wandb']:
-        wandb.init(project='mo-gfn', config=hp_dict, name='seh_frag_moo | number of objectives: ' + str(default_hps['num_objectives']))
+
     hps = {**default_hps, **hp_dict}
     set_seed(hps['seed'])
     trial = SEHMOOFragTrainer(hps, torch.device('cuda'))
