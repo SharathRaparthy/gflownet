@@ -3,6 +3,7 @@ import ast
 from typing import Any, Callable, Dict, List, Tuple, Union
 import wandb
 import yaml
+import random
 import numpy as np
 from rdkit.Chem import Descriptors
 from rdkit.Chem import QED
@@ -195,10 +196,19 @@ class MultiObjectiveStatsHook:
         }
 
 
+def set_seed(seed: int):
+    # Seed seeds for reproducibility of experiments
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
+
+
+
 def main():
     """Example of how this model can be run outside of Determined"""
-    with open("hp_sweep.yaml", "r") as stream:
-        hp_sweep_dict = yaml.safe_load(stream)
     default_hps = {
         'lr_decay': 10000,
         'log_dir': 'logs/seh_frag_moo/run_1/',
@@ -217,14 +227,29 @@ def main():
         'dirichlet_param': 1.5,
         'num_objectives': 2,
         'experiment_name': '',
+        'use_wandb': False,
+        'hp_search': False,
     }
-    if default_hps['baseline_training']:
-        default_hps['experiment_name'] = f'seh_frag_moo_baseline/{default_hps["num_objectives"]}_obj'
+    if default_hps['hp_search']:
+        with open("config/hp_sweep.yaml", "r") as stream:
+            hp_dict = yaml.safe_load(stream)
     else:
-        default_hps['experiment_name'] = f'seh_frag_moo/{default_hps["num_objectives"]}_obj'
+        if default_hps['baseline_training']:
+
+            with open("config/mo_reinforce_hp.yaml", "r") as stream:
+                hp_dict = yaml.safe_load(stream)
+        else:
+            with open("config/seh_moo_hp.yaml", "r") as stream:
+                hp_dict = yaml.safe_load(stream)
+    if default_hps['baseline_training']:
+        default_hps['experiment_name'] = f'seh_frag_moo_baseline/{default_hps["num_objectives"]}_obj/{default_hps["seed"]}'
+    else:
+        default_hps['experiment_name'] = f'seh_frag_moo/{default_hps["num_objectives"]}_obj/{default_hps["seed"]}'
     default_hps['log_dir'] = default_hps['log_dir'] + default_hps["experiment_name"] + "/"
-    wandb.init(project='mo-gfn', config=hp_sweep_dict, name='seh_frag_moo | number of objectives: ' + str(default_hps['num_objectives']))
-    hps = {**default_hps, **hp_sweep_dict}
+    if default_hps['use_wandb']:
+        wandb.init(project='mo-gfn', config=hp_dict, name='seh_frag_moo | number of objectives: ' + str(default_hps['num_objectives']))
+    hps = {**default_hps, **hp_dict}
+    set_seed(hps['seed'])
     trial = SEHMOOFragTrainer(hps, torch.device('cuda'))
     trial.verbose = True
     trial.run()
