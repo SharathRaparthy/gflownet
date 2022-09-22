@@ -1,18 +1,9 @@
-const_temp:
-    - 1
-dirichlet_param:
-    - 1.5
-global_batch_size:
-    - 32
-learning_rate:
-    - 0.0001
-num_emb:
-    - 128
-num_layers:
-    - 6
-seed:
-    - 10
-baseline_training:
-    - True
-use_wandb:
-    - True
+const_temp: 1
+dirichlet_param: 1.5
+global_batch_size: 32
+learning_rate: 0.0001
+num_emb: 128
+num_layers: 6
+seed: 10
+baseline_training: True
+use_wandb: True
