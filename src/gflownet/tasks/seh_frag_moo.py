@@ -243,7 +243,10 @@ def main():
                 hp_dict = yaml.safe_load(stream)
     if default_hps['use_wandb']:
         wandb.init(project='mo-gfn', config=hp_dict, name='seh_frag_moo | number of objectives: ' + str(default_hps['num_objectives']))
-    hps = {**default_hps, **hp_dict}
+    if default_hps['use_wandb']:
+        hps = {**default_hps, **wandb.config}
+    else:
+        hps = default_hps
     if default_hps['baseline_training']:
         hps['experiment_name'] = f'seh_frag_moo_baseline/{hps["num_objectives"]}_obj/{hps["seed"]}'
     else:
