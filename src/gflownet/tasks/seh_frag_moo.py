@@ -220,7 +220,6 @@ def main():
         'temperature_dist_params': '(0, 32)',
         'const_temp': 32,
         'temperature_sample_dist': 'const',
-        'baseline_training': False,
         'num_emb': 64,
         'global_batch_size': 64,
         'learning_rate': 0.0001,
@@ -243,13 +242,12 @@ def main():
                 hp_dict = yaml.safe_load(stream)
     if default_hps['use_wandb']:
         wandb.init(project='mo-gfn', config=hp_dict, name='seh_frag_moo | number of objectives: ' + str(default_hps['num_objectives']))
-    if default_hps['baseline_training']:
-        default_hps['experiment_name'] = f'seh_frag_moo_baseline/{default_hps["num_objectives"]}_obj/{default_hps["seed"]}'
-    else:
-        default_hps['experiment_name'] = f'seh_frag_moo/{default_hps["num_objectives"]}_obj/{default_hps["seed"]}'
-    default_hps['log_dir'] = default_hps['log_dir'] + default_hps["experiment_name"] + "/"
-
     hps = {**default_hps, **hp_dict}
+    if default_hps['baseline_training']:
+        hps['experiment_name'] = f'seh_frag_moo_baseline/{hps["num_objectives"]}_obj/{hps["seed"]}'
+    else:
+        hps['experiment_name'] = f'seh_frag_moo/{hps["num_objectives"]}_obj/{hps["seed"]}'
+    hps['log_dir'] = hps['log_dir'] + hps["experiment_name"] + "/"
     set_seed(hps['seed'])
     trial = SEHMOOFragTrainer(hps, torch.device('cuda'))
     trial.verbose = True

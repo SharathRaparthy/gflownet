@@ -6,7 +6,7 @@ metric:
 parameters:
   const_temp:
     values:
-      - 4
+      - 1
   dirichlet_param:
     values:
       - 1.5
@@ -27,5 +27,8 @@ parameters:
       - 10
       - 20
       - 30
+  baseline_training:
+    values:
+      - True
 program: seh_frag_moo.py
 project: fragments

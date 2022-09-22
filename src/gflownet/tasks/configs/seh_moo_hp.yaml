@@ -30,5 +30,8 @@ parameters:
   use_wandb:
     values:
       - True
+  baseline_training:
+    values:
+      - False
 program: seh_frag_moo.py
 project: fragments
