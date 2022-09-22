@@ -247,6 +247,7 @@ def main():
         hps = {**default_hps, **wandb.config}
     else:
         hps = default_hps
+    print(hps)
     if default_hps['baseline_training']:
         hps['experiment_name'] = f'seh_frag_moo_baseline/{hps["num_objectives"]}_obj/{hps["seed"]}'
     else:
