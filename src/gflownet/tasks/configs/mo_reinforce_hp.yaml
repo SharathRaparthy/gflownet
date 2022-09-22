@@ -1,34 +1,18 @@
-entity: mogfn
-method: grid
-metric:
-  goal: maximize
-  name: HV with zero ref
-parameters:
-  const_temp:
-    values:
-      - 1
-  dirichlet_param:
-    values:
-      - 1.5
-  global_batch_size:
-    values:
-      - 32
-  learning_rate:
-    values:
-      - 0.0001
-  num_emb:
-    values:
-      - 128
-  num_layers:
-    values:
-      - 6
-  seed:
-    values:
-      - 10
-      - 20
-      - 30
-  baseline_training:
-    values:
-      - True
-program: seh_frag_moo.py
-project: fragments
+const_temp:
+    - 1
+dirichlet_param:
+    - 1.5
+global_batch_size:
+    - 32
+learning_rate:
+    - 0.0001
+num_emb:
+    - 128
+num_layers:
+    - 6
+seed:
+    - 10
+baseline_training:
+    - True
+use_wandb:
+    - True

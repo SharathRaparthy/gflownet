@@ -241,14 +241,13 @@ def main():
         else:
             with open("configs/seh_moo_hp.yaml", "r") as stream:
                 hp_dict = yaml.safe_load(stream)
-    if default_hps['use_wandb']:
-        wandb.init(project='mo-gfn', config=hp_dict, name='seh_frag_moo | number of objectives: ' + str(default_hps['num_objectives']))
-    if default_hps['use_wandb']:
-        hps = {**default_hps, **wandb.config}
+    if hp_dict['use_wandb']:
+        hps = {**default_hps, **hp_dict}
     else:
         hps = default_hps
-    print(hps)
-    if default_hps['baseline_training']:
+    if hps['use_wandb']:
+        wandb.init(project='mo-gfn', entity="moreinforce", config=hp_dict, name='seh_frag_moo | number of objectives: ' + str(default_hps['num_objectives']))
+    if hps['baseline_training']:
         hps['experiment_name'] = f'seh_frag_moo_baseline/{hps["num_objectives"]}_obj/{hps["seed"]}'
     else:
         hps['experiment_name'] = f'seh_frag_moo/{hps["num_objectives"]}_obj/{hps["seed"]}'
