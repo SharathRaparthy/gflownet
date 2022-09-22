@@ -246,7 +246,7 @@ def main():
     else:
         hps = default_hps
     if hps['use_wandb']:
-        wandb.init(project='mo-gfn', entity="moreinforce", config=hp_dict, name='seh_frag_moo | number of objectives: ' + str(default_hps['num_objectives']))
+        wandb.init(project='moreinforce', entity="mogfn", config=hp_dict, name='seh_frag_moo | number of objectives: ' + str(default_hps['num_objectives']))
     if hps['baseline_training']:
         hps['experiment_name'] = f'seh_frag_moo_baseline/{hps["num_objectives"]}_obj/{hps["seed"]}'
     else:
