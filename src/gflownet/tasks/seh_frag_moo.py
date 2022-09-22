@@ -236,10 +236,10 @@ def main():
     else:
         if default_hps['baseline_training']:
 
-            with open("config/mo_reinforce_hp.yaml", "r") as stream:
+            with open("configs/mo_reinforce_hp.yaml", "r") as stream:
                 hp_dict = yaml.safe_load(stream)
         else:
-            with open("config/seh_moo_hp.yaml", "r") as stream:
+            with open("configs/seh_moo_hp.yaml", "r") as stream:
                 hp_dict = yaml.safe_load(stream)
     if default_hps['baseline_training']:
         default_hps['experiment_name'] = f'seh_frag_moo_baseline/{default_hps["num_objectives"]}_obj/{default_hps["seed"]}'
