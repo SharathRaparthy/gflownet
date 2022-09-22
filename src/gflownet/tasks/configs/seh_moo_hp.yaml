@@ -27,5 +27,8 @@ parameters:
       - 10
       - 20
       - 30
+  use_wandb:
+    values:
+      - True
 program: seh_frag_moo.py
 project: fragments
