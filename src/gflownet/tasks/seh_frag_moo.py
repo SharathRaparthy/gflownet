@@ -228,6 +228,7 @@ def main():
         'experiment_name': '',
         'use_wandb': False,
         'hp_search': False,
+        'baseline_training': True
     }
     if default_hps['hp_search']:
         with open("config/hp_sweep.yaml", "r") as stream:
