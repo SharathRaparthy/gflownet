@@ -1,9 +1,25 @@
 const_temp: 1
 dirichlet_param: 1.5
-global_batch_size: 32
-learning_rate: 0.0001
+global_batch_size: 256
+learning_rate: 0.0005
 num_emb: 128
 num_layers: 6
-seed: 10
+seed:
+  - 10
+  - 20
+  - 30
+  - 40
+  - 50
+  - 60
+  - 70
+  - 80
+  - 90
+  - 100
+  - 110
+  - 120
+array_job: True
 baseline_training: True
-use_wandb: True
+use_wandb: False
+log_dir: 'logs/seh_moo_baseline_v4_256/'
+rew_type: "convex"
+project: "moreinforce"

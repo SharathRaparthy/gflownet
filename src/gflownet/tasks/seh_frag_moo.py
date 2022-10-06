@@ -5,6 +5,7 @@ import wandb
 import yaml
 import random
 import numpy as np
+import os
 from rdkit.Chem import Descriptors
 from rdkit.Chem import QED
 from rdkit.Chem.rdchem import Mol as RDMol
@@ -37,8 +38,18 @@ class SEHMOOTask(GFNTask):
 
     The proxy is pretrained, and obtained from the original GFlowNet paper, see `gflownet.models.bengio2021flow`.
     """
-    def __init__(self, dataset: Dataset, temperature_distribution: str, temperature_parameters: Tuple[float],
-                 const_temp: int, dirichlet_param: float, num_objectives: int, wrap_model: Callable[[nn.Module], nn.Module] = None):
+    def __init__(
+        self,
+        dataset: Dataset,
+        temperature_distribution: str,
+        temperature_parameters: Tuple[float],
+        const_temp: int,
+        dirichlet_param: float,
+        num_objectives: int, 
+        rew_type: str,
+        wrap_model: Callable[[nn.Module], nn.Module] = None, 
+        
+    ):
         self._wrap_model = wrap_model
         self.models = self._load_task_models()
         self.dataset = dataset
@@ -47,6 +58,8 @@ class SEHMOOTask(GFNTask):
         self.const_temp = const_temp
         self.dirichlet_param = dirichlet_param
         self.num_objectives = num_objectives
+        self.rew_type = rew_type
+        self.reward_min = 1e-20
 
     def flat_reward_transform(self, y: Union[float, Tensor]) -> FlatRewards:
         return FlatRewards(torch.as_tensor(y))
@@ -96,8 +109,13 @@ class SEHMOOTask(GFNTask):
             else:
                 flat_reward = torch.tensor(flat_reward)
         if not mo_baseline:
-            scalar_reward = (flat_reward * cond_info['preferences']).sum(1)
+            if self.rew_type == "convex":
+                scalar_reward = (flat_reward * cond_info['preferences']).sum(1)
+            else:
+                # Log convex reward
+                scalar_reward = ((flat_reward * cond_info['preferences']).clamp(min=self.reward_min).log()).sum(1).exp()
         else:
+            
             scalar_reward = (torch.abs(-flat_reward - torch.zeros(flat_reward.shape[1])) * cond_info['preferences']).max(1)[0]
         return scalar_reward**cond_info['beta']
 
@@ -144,6 +162,7 @@ class SEHMOOFragTrainer(SEHFragTrainer):
             dirichlet_param=self.hps['dirichlet_param'],
             const_temp=self.hps['const_temp'],
             num_objectives=self.hps['num_objectives'],
+            rew_type=self.hps['rew_type'],
             wrap_model=self._wrap_model_mp
         )
         self.sampling_hooks.append(MultiObjectiveStatsHook(256))
@@ -211,8 +230,7 @@ def main():
     """Example of how this model can be run outside of Determined"""
     default_hps = {
         'lr_decay': 10000,
-        'log_dir': 'logs/seh_frag_moo/run_1/',
-        'num_training_steps': 20_000,
+        'num_training_steps': 40_000,
         'validate_every': 500,
         'sampling_tau': 0.95,
         'num_layers': 6,
@@ -224,35 +242,49 @@ def main():
         'global_batch_size': 64,
         'learning_rate': 0.0001,
         'dirichlet_param': 1.5,
-        'num_objectives': 2,
+        'num_objectives': 4,
         'experiment_name': '',
         'use_wandb': True,
         'hp_search': False,
-        'baseline_training': True
+        'baseline_training': False
+        
     }
     if default_hps['hp_search']:
         with open("config/hp_sweep.yaml", "r") as stream:
             hp_dict = yaml.safe_load(stream)
     else:
         if default_hps['baseline_training']:
-
+            print("="*50 + "MO-REINFORCE TRAINING" + "="*50)
             with open("configs/mo_reinforce_hp.yaml", "r") as stream:
                 hp_dict = yaml.safe_load(stream)
         else:
             with open("configs/seh_moo_hp.yaml", "r") as stream:
                 hp_dict = yaml.safe_load(stream)
-    if hp_dict['use_wandb']:
-        hps = {**default_hps, **hp_dict}
+   
+    hps = {**default_hps, **hp_dict}
+    
+    print("Hyperparameters:")
+    for key, value in hps.items():
+        print(f"\t{key}: {value}")
+    
+    if hps['array_job']:
+        array_index = int(os.environ["SLURM_ARRAY_TASK_ID"]) - 1
+        seed = hps['seed'][array_index]
     else:
-        hps = default_hps
+        array_index = 0
+        seed = hps["seed"][array_index]
+
     if hps['use_wandb']:
-        wandb.init(project='moreinforce', entity="mogfn", config=hp_dict, name='seh_frag_moo | number of objectives: ' + str(default_hps['num_objectives']))
+        wandb.init(project=hps["project"], entity="mogfn", config=hp_dict, name=f'seh_frag_moo_{hps["baseline_training"]} | number of objectives: ' + str(default_hps['num_objectives']))
     if hps['baseline_training']:
-        hps['experiment_name'] = f'seh_frag_moo_baseline/{hps["num_objectives"]}_obj/{hps["seed"]}'
+        hps['experiment_name'] = f'seh_frag_moo_baseline/{hps["num_objectives"]}_obj/{seed}'
     else:
-        hps['experiment_name'] = f'seh_frag_moo/{hps["num_objectives"]}_obj/{hps["seed"]}'
+        hps['experiment_name'] = f'seh_frag_moo_{hps["rew_type"]}/{hps["num_objectives"]}_obj/{seed}'
     hps['log_dir'] = hps['log_dir'] + hps["experiment_name"] + "/"
-    set_seed(hps['seed'])
+    
+    set_seed(seed)
+    
+
     trial = SEHMOOFragTrainer(hps, torch.device('cuda'))
     trial.verbose = True
     trial.run()

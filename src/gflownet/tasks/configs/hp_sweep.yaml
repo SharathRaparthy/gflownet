@@ -4,6 +4,7 @@ metric:
   goal: maximize
   name: HV with zero ref
 parameters:
+  rew_type: "log_convex"
   const_temp:
     values:
       - 4
@@ -11,10 +12,7 @@ parameters:
       - 16
   dirichlet_param:
     values:
-      - 1.0
       - 1.5
-      - 2.0
-      - 2.5
   global_batch_size:
     values:
       - 32
